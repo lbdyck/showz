@@ -18,6 +18,7 @@
   |                                                            |
   | History:  (most recent on top)                             |
   |     v0.6   2024/07/28 LBD - Add MODE command               |
+  |                           - Enhanced table row color       |
   |     v0.5   2024/07/28 LBD - More cleanup                   |
   |     v0.4   2024/07/28 LBD - Add Only/Refresh               |
   |     v0.3   2024/07/27 LBD - Cleanup                        |
@@ -58,6 +59,7 @@
   zerralrm = 'NO'         /* yes or no */
   zerrtp   = 'Notify'     /* notify, warning, action, critial */
   viewmode = 'Browse'     /* Browse or View - change with MODE command */
+  showc    = 'turq'       /* default section color */
 
   Address ISPExec
   call Build_Table
@@ -175,6 +177,7 @@
         zerrlm = 'Table display limited to ONLY criteria: "'search'"' ,
             'in' orow 'titles.'
         'setmsg msg(isrz003)'
+        showc = 'blue'
         ztdtop = 0
         end
         else do
@@ -188,6 +191,7 @@
            zerrsm = 'Refreshed.'
            zerrlm = 'SHOWZOS Table Refreshed.'
            'setmsg msg(isrz003)'
+          showc = 'turq'
            end
         otherwise rowid = 0
       end
@@ -666,16 +670,15 @@ DropISPF: Procedure
 >Start
 >Panel showzos
 )Attr Default(%+_)
-  @ type(Output)
+  @ type(Output) color(&showc)
   ! type(Output) color(red) color(blue)
   _ type(input) hilite(uscore) intens(low) caps(on)
-  $ type(input) hilite(uscore) intens(low) caps(on)
+  $ type(input) hilite(uscore) intens(low) caps(on) color(white)
 )Body  Expand(\\)
 %-\-\- SHOWzOS &rel Section Table - &ver %-\-\-
 %Command ===>_zcmd                                 \ \%Scroll ===>_amt +
 %
-+S  Title
-+
+%S  Section
 )Model
 $z+@z                                                                          +
 )Init
