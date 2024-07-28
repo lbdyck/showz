@@ -1,0 +1,699 @@
+  /* --------------------  rexx procedure  -------------------- */
+  ver = '0.4'
+  /*Name:      SHOWZOST                                        |
+  |                                                            |
+  | Function:  Display the SHOWZOS reports in an ISPF Table    |
+  |                                                            |
+  | Syntax:    %showzost                                       |
+  |                                                            |
+  | Usage Notes:  1. See *custom*                              |
+  |                                                            |
+  | Dependencies:  SHOWZOS installed                           |
+  |                                                            |
+  | Author:    Lionel B. Dyck                                  |
+  |                                                            |
+  | History:  (most recent on top)                             |
+  |     v0.4   2024/07/28 LBD - Add Only/Refresh               |
+  |     v0.3   2024/07/27 LBD - Cleanup                        |
+  |     v0.2   2024/07/26 LBD - Get RFIND working              |
+  |                           - Enable Point/Shoot             |
+  |                       JPK - Add tutorial panel             |
+  |     v0.1   2024/07/25 LBD - More Refinement                |
+  |            2024/07/24 JPK - Panel changes:                 |
+  |                             Add SHOWzOS release number     |
+  |                             Color the Act(ion) field       |
+  |                             Rename Browse/View: field to   |
+  |                                    Mode:                   |
+  |            2024/07/24 LBD - Refinement                     |
+  |            2024/07/20 LBD - Creation                       |
+  |                                                            |
+  * ---------------------------------------------------------- */
+  /* -------------------------------------------------------------- *
+   | The commands ONLY and REFRESH are not enabled and the routines |
+   | are commented out.                                             |
+   | The reason is the FIND/RFIND do not work after ONLY is invoked |
+   | as the rowid is unchanged even with the non-matching rows      |
+   | deleted.  *** If anyone can fix this please ***                |
+   |                                                                |
+   * -------------------------------------------------------------- */
+
+  parse value '' with null act
+
+  /* -------------------------------------------------- *
+  | Update the SHOWZOS load library to enable it to be |
+  | called authorized.  ***custom***                   |
+  * -------------------------------------------------- */
+  loadlib = 'sys2.cbt.linklib'
+
+  /* --------------------- *
+  | define other defaults |
+  * --------------------- */
+  zerrhm   = 'showzosh'   /* tutorial panel or null */
+  zerralrm = 'NO'         /* yes or no */
+  zerrtp   = 'Notify'     /* notify, warning, action, critial */
+
+  Address ISPExec
+  call Build_Table
+  call enable_rfind
+
+  /* ------------------------------- *
+  | Dynamically load the ISPF Panel |
+  * ------------------------------- */
+  load_info = loadispf()
+
+  /* --------------------- *
+  | Now process the table |
+  * --------------------- */
+  rel = substr(show.1,26,4)
+  do forever
+    sel = null
+    zcmd = null
+    shorfind = 'PASSTHRU'
+    'vput (shorfind)'
+    'tbtop showzos'
+    'tbskip showzos number('ztdtop')'
+    'tbdispl showzos panel(showzos) csrrow('rowid') rowid(row)'
+    if rc > 4 then leave
+    shorfind = null
+    'vput (shorfind)'
+    /* --------------------- *
+    | Process zcmd - if any |
+    * --------------------- */
+    if zcmd /= null then  do
+      sel = null
+      if zcmd = 'RFIND' then do
+        if last_find > 0 then do
+          'tbtop showzos'
+          'tbskip showzos number('last_find')'
+        end
+        zcmd = 'FIND' search
+      end
+      Select
+        When abbrev('FIND',word(zcmd,1)) = 1 then do
+          save_top = ztdtop
+          csr_pos = ztdtop
+          search = strip(subword(zcmd,2))
+          wrap = 0
+          wmsg = null
+          do forever
+            'tbskip showzos position(rowid)'
+            if rc = 0 then do
+              if pos(search,translate(title)) = 0 then iterate
+              zerrsm = 'Found.'
+              if wrap = 1 then do
+                wmsg = 'Wrapped.'
+                zerrsm = 'Wrapped.'
+              end
+              zerrlm = wmsg search 'Found in a row' rowid'.'
+              'setmsg msg(isrz003)'
+              ztdtop = rowid
+              last_find = rowid
+              leave
+            end
+            if rc > 0 then do
+              if wrap = 0 then do
+                wrap = 1
+                'tbtop showzos'
+                iterate
+              end
+              'tbtop showzos'
+              'tbskip showzos number('save_top')'
+              zerrsm = 'Not Found.'
+              zerrlm = search 'not found in a SHOWZOS Section Title.'
+              'setmsg msg(isrz003)'
+              last_find = 0
+              leave
+            end
+          end
+        end
+        When abbrev('REFRESH',word(zcmd,1)) = 1 then do
+           'tbend showzos'
+           call build_table
+           zerrsm = 'Refreshed.'
+           zerrlm = 'SHOWZOS Table Refreshed.'
+           'setmsg msg(isrz003)'
+           end
+        When abbrev('ONLY',word(zcmd,1)) = 1 then do
+        orow = 0
+        search = translate(subword(zcmd,2))
+        'tbtop showzos'
+        do forever
+           'tbskip showzos'
+           if rc > 0 then leave
+           if pos(search,translate(title)) = 0 then do
+              'tbdelete showzos'
+              iterate
+              end
+           orow = orow + 1
+        end
+        if orow > 0 then do
+        'tbtop showzos'
+        zerrsm = 'Completed.'
+        zerrlm = 'Table display limited to ONLY criteria: "'search'"' ,
+            'in' orow 'titles.'
+        'setmsg msg(isrz003)'
+        ztdtop = 0
+        end
+        else do
+            'tbend showzos'
+            call build_table
+            end
+        end
+        otherwise rowid = 0
+      end
+    end
+    /* ------------------------------ *
+    | Process row selection - if any |
+    * ------------------------------ */
+    else if row > 0 then do
+      'tbtop showzos'
+      'tbskip showzos number('row')'
+      act = '*'
+      'tbput showzos'
+      'control display save'
+      call display_it
+      'control display restore'
+      sel = null
+      rowid = 0
+    end
+  end
+  /* ---------------- *
+  | Done so clean up |
+  * ---------------- */
+  call remove_rfind
+  'tbend showzos'
+  rc = dropispf(load_info)
+  Exit 0
+
+Display_It:
+  Address TSO
+  'Alloc f(showzos) unit(vio) spa(5,5) tr recfm(v b) lrecl('lrecl')' ,
+    'blksize(0) new reuse'
+  if part = 0
+  then 'execio * diskw showzos (finis stem show.'
+  else 'execio * diskw showzos (finis stem table.'part'.'
+  Address ISPExec
+  "LMINIT DATAID(STATUS) DDname(showzos)"
+  'Browse dataid('status')'
+  "LMFree  Dataid("status")"
+  Address TSO 'Free f(showzos)'
+  return
+
+  /* ----------------------------------- *
+  | Now Build the ISPF Table and Panels |
+  * ----------------------------------- */
+Build_Table:
+  /* ----------------------------------------------- *
+  | Invoke SHOWZOS as a program and capture results |
+  * ----------------------------------------------- */
+  if datatype(show.0) /= 'NUM' then do
+    Address TSO
+    'Alloc f(showmvs) unit(vio) spa(30,30) tr new'
+    call outtrap 'xhow.'
+    "call '"loadlib"(showzos)' 'HARD-COPY'"
+    call outtrap 'off'
+    drop xhow.
+    'Execio * diskr showmvs (finis stem show.'
+    'Free f(showmvs)'
+    Address ISPExec
+  end
+
+  /* ----------------------- *
+  | Generate the ISPF Table |
+  * ----------------------- */
+  section = 1
+  row = 1
+  lrecl = 0
+  last_find = 0
+  table.section.row = 'SHOWZos Info'
+  do i = 1 to show.0
+    show_data = substr(show.i,2)
+    if length(show_data) > lrecl
+    then lrecl = length(show_data)
+    if left(show_data,1) /= '>' then do
+      row = row + 1
+      table.section.row = show_data
+    end
+    else do
+      table.section.0 = row
+      section = section + 1
+      row = 1
+      show_data = strip(show_data,'T')
+      if right(show_data,1) = ':'
+      then table.section.row = substr(left(show_data,length(show_data)-1),2)
+      else table.section.row = substr(show_data,2)
+    end
+  end
+  lrecl = lrecl + 4  /* add rdw */
+  table.section.0 = row
+  'tbcreate showzos names(title part act) nowrite'
+  title = '--- All SHOWZos Reports ---'
+  part  = 0
+  'tbadd showzos'
+  do i = 1 to section
+    title = table.i.1
+    part = i
+    'tbadd showzos'
+  end
+  ztdsels = 0
+  ztdtop = 0
+  rowid = 0
+  'tbsort showzos fields(title,ch,a)'
+  return
+
+Enable_RFind:
+  /* --------------> Enable Repeat Find <------------------- *
+  | This approach does not require recursion or creating an |
+  | ISPF table for the applications commands. This approach |
+  | updates the active site command table in memory.        |
+  |                                                         |
+  | This does:                                              |
+  | 1. Define the commmand table entry                      |
+  | 2. vget the variable with the prefix for the site ISPF  |
+  |    command table.                                       |
+  | 3. define a varable with the command table name         |
+  | 4. Move to the top of the command table                 |
+  | 5. Establish the table search                           |
+  | 6. if the entry is found then add it                    |
+  | 7. prime the variable to null                           |
+  * ------------------------------------------------------- */
+  zctverb = 'RFIND'
+  zctact = "&shorfind"
+  zctdesc = "SHOWZOS User controlled Repeat Find (RFIND)"
+  zcttrunc = 0
+  'vget (zsctpref)'
+  if zsctpref = null then zsctpref = 'ISP'
+  ctab = zsctpref'cmds'
+  'tbtop' ctab
+  'tbvclear' ctab
+  'tbscan' ctab 'arglist(zctdesc) condlist(EQ) Next'
+  if rc > 0 then 'tbadd' ctab
+  shorfind = null
+  'vput (shorfind)'
+  rfind_opt = 1
+  return
+
+Remove_RFind:
+  /* --------------> Remove Repeat Find <------------------- *
+  * ------------------------------------------------------- */
+  zctdesc = "SHOWZOS User controlled Repeat Find (RFIND)"
+  'vget (zsctpref)'
+  if zsctpref = null then zsctpref = 'ISP'
+  ctab = zsctpref'cmds'
+  'tbtop' ctab
+  'tbvclear' ctab
+  'tbscan' ctab 'arglist(zctdesc) condlist(EQ) Next'
+  if rc = 0 then 'tbdelete' ctab
+  rfind_opt = null
+  return
+
+/* --------------------  rexx procedure  -------------------- *
+ * Name:      LoadISPF                                        *
+ *                                                            *
+ * Function:  Load ISPF elements that are inline in the       *
+ *            REXX source code.                               *
+ *                                                            *
+ * Syntax:    load_info = loadispf()                          *
+ *            rc = dropispf(load_info)                        *
+ *                                                            *
+ *            *** Note that dropispf is a routine at the      *
+ *            *** bottom of this exec.                        *
+ *                                                            *
+ *            The inline ISPF resources are limited to        *
+ *            ISPF Messages, Panels, and Skeletons,           *
+ *                 CLISTs and EXECs are also supported.       *
+ *                                                            *
+ *            The inline resources must start in column 1     *
+ *            and use the following syntax:                   *
+ *                                                            *
+ *            >START    used to indicate the start of the     *
+ *                      inline data                           *
+ *                                                            *
+ *            >END    - used to indicate the end of the       *
+ *                      inline data                           *
+ *                                                            *
+ *            Each resource begins with a type record:        *
+ *            >type name                                      *
+ *               where type is CLIST, EXEC, MSG, PANEL, SKEL  *
+ *                     name is the name of the element        *
+ *                                                            *
+ * Sample usage:                                              *
+ *          -* rexx *-                                        *
+ *          load_info = loadispf()                            *
+ *          ... magic code happens here (your code) ...       *
+ *          rc = dropispf(load_info)                          *
+ *          exit                                              *
+ *          >Start inline elements                            *
+ *          >Panel panel1                                     *
+ *          ...                                               *
+ *          >Msg msg1                                         *
+ *          ...                                               *
+ *          >End of inline elements                           *
+ *                                                            *
+ * Returns:   the list of ddnames allocated for use along     *
+ *            with the libdef's performed or altlib           *
+ *                                                            *
+ *            format is ddname libdef ddname libdef ...       *
+ *                   libdef may be altlibc or altlibe         *
+ *                   for altlib clist or altlib exec          *
+ *                                                            *
+ * Notes:     Entire routine must be included with REXX       *
+ *            exec - inline with the code.                    *
+ *                                                            *
+ * Comments:  The entire rexx program is processed from the   *
+ *            last record to the first to find the >START     *
+ *            record at which point all records from that     *
+ *            point on are processed until the >END           *
+ *            statement or the end of the program is found.   *
+ *                                                            *
+ *            It is *strongly* suggested that the inline      *
+ *            elements be at the very end of your code so     *
+ *            that the search for them is faster.             *
+ *                                                            *
+ *            Inline ISPTLIB or ISPLLIB were not supported    *
+ *            because the values for these would have to be   *
+ *            in hex.                                         *
+ *                                                            *
+ * Author:    Lionel B. Dyck                                  *
+ *                                                            *
+ * History:                                                   *
+ *            01/09/19 - Include DROPISPF routine             *
+ *            08/29/17 - Fixup static values that were vars   *
+ *            05/31/17 - Change default directory count       *
+ *            12/09/16 - update for add_it routine            *
+ *            05/10/16 - correction for clist and exec        *
+ *            04/19/16 - bug correction                       *
+ *            06/04/04 - Enhancements for speed               *
+ *            08/05/02 - Creation                             *
+ *                                                            *
+ * ---------------------------------------------------------- *
+ * Disclaimer: There is no warranty, either explicit or       *
+ * implied with this code. Use it at your own risk as there   *
+ * is no recourse from either the author or his employeer.    *
+ * ---------------------------------------------------------- */
+LoadISPF: Procedure
+
+  parse value "" with null kmsg kpanel kskel first returns ,
+    kclist kexec
+/* ------------------------------------------------------- *
+ * Find the InLine ISPF Elements and load them into a stem *
+ * variable.                                               *
+ *                                                         *
+ * Elements keyword syntax:                                *
+ * >START - start of inline data                           *
+ * >CLIST name                                             *
+ * >EXEC name                                              *
+ * >MSG name                                               *
+ * >PANEL name                                             *
+ * >SKEL name                                              *
+ * >END   - end of all inline data (optional if last)      *
+ * ------------------------------------------------------- */
+  last_line = sourceline()
+  do i = last_line to 1 by -1
+    line = sourceline(i)
+    if translate(left(line,6)) = ">START " then leave
+  end
+  rec = 0
+/* --------------------------------------------------- *
+ * Flag types of ISPF resources by testing each record *
+ * then add each record to the data. stem variable.    *
+ * --------------------------------------------------- */
+  do j = i+1 to last_line
+    line = sourceline(j)
+    if translate(left(line,5)) = ">END "   then leave
+    if translate(left(line,7)) = ">CLIST " then kclist = 1
+    if translate(left(line,6)) = ">EXEC "  then kexec  = 1
+    if translate(left(line,5)) = ">MSG "   then kmsg   = 1
+    if translate(left(line,7)) = ">PANEL " then kpanel = 1
+    if translate(left(line,6)) = ">SKEL "  then kskel  = 1
+    rec  = rec + 1
+    data.rec = line
+  end
+
+/* ----------------------------------------------------- *
+ * Now create the Library and Load the Member(s)         *
+ * ----------------------------------------------------- */
+  Address ISPExec
+/* ----------------------------- *
+ * Assign dynamic random ddnames *
+ * ----------------------------- */
+  clistdd = "lc"random(999)
+  execdd  = "le"random(999)
+  msgdd   = "lm"random(999)
+  paneldd = "lp"random(999)
+  skeldd  = "ls"random(999)
+
+/* ---------------------------------------- *
+ *  LmInit and LmOpen each resource library *
+ * ---------------------------------------- */
+  if kclist <> null then do
+    call alloc_dd clistdd
+    "Lminit dataid(clist) ddname("clistdd")"
+    "LmOpen dataid("clist") Option(Output)"
+    returns = strip(returns clistdd 'ALTLIBC')
+  end
+  if kexec <> null then do
+    call alloc_dd execdd
+    "Lminit dataid(exec) ddname("execdd")"
+    "LmOpen dataid("exec") Option(Output)"
+    returns = strip(returns execdd 'ALTLIBE')
+  end
+  if kmsg <> null then do
+    call alloc_dd msgdd
+    "Lminit dataid(msg) ddname("msgdd")"
+    "LmOpen dataid("msg") Option(Output)"
+    returns = strip(returns msgdd 'ISPMLIB')
+  end
+  if kpanel <> null then do
+    call alloc_dd paneldd
+    "Lminit dataid(panel) ddname("paneldd")"
+    "LmOpen dataid("panel") Option(Output)"
+    returns = strip(returns paneldd 'ISPPLIB')
+  end
+  if kskel <> null then do
+    call alloc_dd skeldd
+    "Lminit dataid(skel) ddname("skeldd")"
+    "LmOpen dataid("skel") Option(Output)"
+    returns = strip(returns skeldd 'ISPSLIB')
+  end
+
+/* ----------------------------------------------- *
+ * Process all records in the data. stem variable. *
+ * ----------------------------------------------- */
+  do i = 1 to rec
+    record = data.i
+    recordu = translate(record)
+    if left(recordu,5) = ">END " then leave
+    if left(recordu,7) = ">CLIST " then do
+      if first = 1 then call add_it
+      type = "Clist"
+      first = 1
+      parse value record with x name
+      iterate
+    end
+    if left(recordu,6) = ">EXEC " then do
+      if first = 1 then call add_it
+      type = "Exec"
+      first = 1
+      parse value record with x name
+      iterate
+    end
+    if left(recordu,5) = ">MSG " then do
+      if first = 1 then call add_it
+      type = "Msg"
+      first = 1
+      parse value record with x name
+      iterate
+    end
+    if left(recordu,7) = ">PANEL " then do
+      if first = 1 then call add_it
+      type = "Panel"
+      first = 1
+      parse value record with x name
+      iterate
+    end
+    if left(recordu,6) = ">SKEL " then do
+      if first = 1 then call add_it
+      type = "Skel"
+      first = 1
+      parse value record with x name
+      iterate
+    end
+   /* --------------------------------------------*
+    * Put the record into the appropriate library *
+    * based on the record type.                   *
+    * ------------------------------------------- */
+    Select
+      When type = "Clist" then
+      "LmPut dataid("clist") MODE(INVAR)" ,
+        "DataLoc(record) DataLen(255)"
+      When type = "Exec" then
+      "LmPut dataid("exec") MODE(INVAR)" ,
+        "DataLoc(record) DataLen(255)"
+      When type = "Msg" then
+      "LmPut dataid("msg") MODE(INVAR)" ,
+        "DataLoc(record) DataLen(80)"
+      When type = "Panel" then
+      "LmPut dataid("panel") MODE(INVAR)" ,
+        "DataLoc(record) DataLen(80)"
+      When type = "Skel" then
+      "LmPut dataid("skel") MODE(INVAR)" ,
+        "DataLoc(record) DataLen(80)"
+      Otherwise nop
+    end
+  end
+  if type <> null then call add_it
+/* ---------------------------------------------------- *
+ * Processing completed - now lmfree the allocation and *
+ * Libdef the library.                                  *
+ * ---------------------------------------------------- */
+  if kclist <> null then do
+    Address TSO,
+      "Altlib Act Application(Clist) File("clistdd")"
+    "LmFree dataid("clist")"
+  end
+  if kexec <> null then do
+    Address TSO,
+      "Altlib Act Application(Exec) File("execdd")"
+    "LmFree dataid("exec")"
+  end
+  if kmsg <> null then do
+    "LmFree dataid("msg")"
+    "Libdef ISPMlib Library ID("msgdd") Stack"
+  end
+  if kpanel <> null then do
+    "Libdef ISPPlib Library ID("paneldd") Stack"
+    "LmFree dataid("panel")"
+  end
+  if kskel <> null then do
+    "Libdef ISPSlib Library ID("skeldd") Stack"
+    "LmFree dataid("skel")"
+  end
+  return returns
+
+/* --------------------------- *
+ * Add the Member using LmmAdd *
+ * based upon type of resource *
+ * --------------------------- */
+Add_It:
+  Select
+    When type = "Clist" then
+    "LmmAdd dataid("clist") Member("name")"
+    When type = "Exec" then
+    "LmmAdd dataid("exec") Member("name")"
+    When type = "Msg" then
+    "LmmAdd dataid("msg") Member("name")"
+    When type = "Panel" then
+    "LmmAdd dataid("panel") Member("name")"
+    When type = "Skel" then
+    "LmmAdd dataid("skel") Member("name")"
+    Otherwise nop
+  end
+  type = null
+  return
+
+/* ------------------------------ *
+ * ALlocate the temp ispf library *
+ * ------------------------------ */
+Alloc_DD:
+  arg dd
+  Address TSO
+  if pos(left(dd,2),"lc le") > 0 then
+  "Alloc f("dd") unit(sysda) spa(5,5) dir(5)",
+    "recfm(v b) lrecl(255) blksize(32760)"
+  else
+  "Alloc f("dd") unit(sysda) spa(5,5) dir(5)",
+    "recfm(f b) lrecl(80) blksize(23440)"
+  return
+
+/* --------------------  rexx procedure  -------------------- *
+ * Name:      DropISPF                                        *
+ *                                                            *
+ * Function:  Remove ISPF LIBDEF's and deactivate ALTLIB's    *
+ *            that were created by the LoadISPF function.     *
+ *                                                            *
+ * Syntax:    rc = dropispf(load_info)                        *
+ *                                                            *
+ * Author:    Janko                                           *
+ *                                                            *
+ * History:                                                   *
+ *            12/05/18 - Creation                             *
+ * ---------------------------------------------------------- */
+DropISPF: Procedure
+  arg load_info
+  Address ISPEXEC
+  do until length(load_info) = 0
+    parse value load_info with dd libd load_info
+    if left(libd,6) = "ALTLIB" then do
+      if libd = "ALTLIBC" then lib = "CLIST"
+      else lib = "EXEC"
+      Address TSO,
+        "Altlib Deact Application("lib")"
+    end
+    else "libdef" libd
+    address tso "free f("dd")"
+  end
+  return 0
+
+>Start
+>Panel showzos
+)Attr Default(%+_)
+  @ type(Output)
+  ! type(Output) color(red) color(blue)
+  _ type(input) hilite(uscore) intens(low) caps(on)
+  $ type(input) hilite(uscore) intens(low) caps(on)
+)Body  Expand(\\)
+%-\-\- SHOWzOS &rel Section Table - &ver %-\-\-
+%Command ===>_zcmd                                 \ \%Scroll ===>_amt +
+%
++S  Title
++
+)Model
+$z+@z                                                                       +!z+
+)Init
+  .ZVARS = '(sel title act)'
+  &amt = CSR
+  .help = showzosh
+)Proc
+ IF (&ZCMD = &Z)
+     if (&ztdsels = 0000)
+        &row = .csrrow
+        if (&row ^= 0)
+            if (&sel = &z)
+                &sel = S
+     if (&ztdsels ^= 0000)
+          &row = .csrrow
+     &osel = &vsel
+)End
+>Panel showzosh
+)ATTR DEFAULT(%+_)
+   %   TYPE(TEXT)  INTENS(HIGH) SKIP(ON)
+   +   TYPE(TEXT)  INTENS(LOW)  SKIP(ON) COLOR(TURQ)
+   !   TYPE(TEXT)  INTENS(LOW)  SKIP(ON) COLOR(RED)
+   @   TYPE(TEXT)  INTENS(HIGH) SKIP(ON) HILITE(USCORE) COLOR(BLUE)
+   _   TYPE(INPUT) INTENS(HIGH) CAPS(ON) JUST(LEFT) HILITE(USCORE)
+)BODY EXPAND(\\)
+%Tutorial+\-\(%SHOWzOST+)\-\%Tutorial
+%Command ===>_ZCMD
++
++Primary Commands:
+  %  Find string      +Find row with string
+  %  Only string      +Display all sections with string
+  %  Refresh          +Display all sections (used after Only)
++
++Line Commands:
+%    any+             +Any non-blank to Select a SHOWzOS report to be Viewed
++                      Or just place the cursor and press Enter
++
+%Food for thought:
++
++  "I hear, I know."                    "Every failure is a step to success."
++     "I see, I remember."               --- William Whewell
++        "I do, I understand."
++  --- Confucius
++
++
+)PROC
+ &zcont = showzosh
+)End
+>End
