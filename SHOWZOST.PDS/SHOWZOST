@@ -1,5 +1,5 @@
   /* --------------------  rexx procedure  -------------------- */
-  ver = '0.4'
+  ver = '0.6'
   /*Name:      SHOWZOST                                        |
   |                                                            |
   | Function:  Display the SHOWZOS reports in an ISPF Table    |
@@ -17,6 +17,8 @@
   |                    John Kalinich                           |
   |                                                            |
   | History:  (most recent on top)                             |
+  |     v0.6   2024/07/28 LBD - Add MODE command               |
+  |     v0.5   2024/07/28 LBD - More cleanup                   |
   |     v0.4   2024/07/28 LBD - Add Only/Refresh               |
   |     v0.3   2024/07/27 LBD - Cleanup                        |
   |     v0.2   2024/07/26 LBD - Get RFIND working              |
@@ -41,7 +43,7 @@
    |                                                                |
    * -------------------------------------------------------------- */
 
-  parse value '' with null act
+  parse value '' with null
 
   /* -------------------------------------------------- *
   | Update the SHOWZOS load library to enable it to be |
@@ -55,6 +57,7 @@
   zerrhm   = 'showzosh'   /* tutorial panel or null */
   zerralrm = 'NO'         /* yes or no */
   zerrtp   = 'Notify'     /* notify, warning, action, critial */
+  viewmode = 'Browse'     /* Browse or View - change with MODE command */
 
   Address ISPExec
   call Build_Table
@@ -130,12 +133,28 @@
             end
           end
         end
-        When abbrev('REFRESH',word(zcmd,1)) = 1 then do
-           'tbend showzos'
-           call build_table
-           zerrsm = 'Refreshed.'
-           zerrlm = 'SHOWZOS Table Refreshed.'
-           'setmsg msg(isrz003)'
+        When abbrev('MODE',word(zcmd,1)) = 1 then do
+             If words(zcmd) = 1 then zcmd = 'M B'
+           Select
+             When abbrev('BROWSE',word(zcmd,2)) = 1 then do
+                viewmode = 'Browse'
+                zerrsm = 'Browse Set.'
+                zerrlm = 'Mode changed to Browse.'
+                'setmsg msg(isrz003)'
+                end
+             When abbrev('VIEW',word(zcmd,2)) = 1 then do
+                viewmode = 'View'
+                zerrsm = 'View Set.'
+                zerrlm = 'Mode changed to View.'
+                'setmsg msg(isrz003)'
+                end
+             Otherwise do
+               zerrsm = 'Ignored.'
+               zerrlm = 'Mode unchanged as unrecognized - not Browse',
+                  'or View.'
+               'setmsg msg(isrz003)'
+               end
+           end
            end
         When abbrev('ONLY',word(zcmd,1)) = 1 then do
         orow = 0
@@ -163,6 +182,13 @@
             call build_table
             end
         end
+        When abbrev('REFRESH',word(zcmd,1)) = 1 then do
+           'tbend showzos'
+           call build_table
+           zerrsm = 'Refreshed.'
+           zerrlm = 'SHOWZOS Table Refreshed.'
+           'setmsg msg(isrz003)'
+           end
         otherwise rowid = 0
       end
     end
@@ -172,8 +198,6 @@
     else if row > 0 then do
       'tbtop showzos'
       'tbskip showzos number('row')'
-      act = '*'
-      'tbput showzos'
       'control display save'
       call display_it
       'control display restore'
@@ -198,7 +222,7 @@ Display_It:
   else 'execio * diskw showzos (finis stem table.'part'.'
   Address ISPExec
   "LMINIT DATAID(STATUS) DDname(showzos)"
-  'Browse dataid('status')'
+  viewmode 'dataid('status')'
   "LMFree  Dataid("status")"
   Address TSO 'Free f(showzos)'
   return
@@ -250,7 +274,7 @@ Build_Table:
   end
   lrecl = lrecl + 4  /* add rdw */
   table.section.0 = row
-  'tbcreate showzos names(title part act) nowrite'
+  'tbcreate showzos names(title part) nowrite'
   title = '--- All SHOWZos Reports ---'
   part  = 0
   'tbadd showzos'
@@ -653,9 +677,9 @@ DropISPF: Procedure
 +S  Title
 +
 )Model
-$z+@z                                                                       +!z+
+$z+@z                                                                          +
 )Init
-  .ZVARS = '(sel title act)'
+  .ZVARS = '(sel title)'
   &amt = CSR
   .help = showzosh
 )Proc
@@ -682,6 +706,7 @@ $z+@z                                                                       +!z+
 +
 +Primary Commands:
   %  Find string      +Find row with string
+  %  Mode B or V      +Set display mode Browse or View
   %  Only string      +Display all sections with string
   %  Refresh          +Display all sections (used after Only)
 +
@@ -689,13 +714,9 @@ $z+@z                                                                       +!z+
 %    any+             +Any non-blank to Select a SHOWzOS report to be Viewed
 +                      Or just place the cursor and press Enter
 +
-%Food for thought:
-+
-+  "I hear, I know."                    "Every failure is a step to success."
-+     "I see, I remember."               --- William Whewell
-+        "I do, I understand."
-+  --- Confucius
-+
++  This ISPF dialog is built on top of the great work of%Gilbert Saint-flour+
++  who developed this code originally and to%Roland Schiradin+who currently
++  supports it.
 +
 )PROC
  &zcont = showzosh
