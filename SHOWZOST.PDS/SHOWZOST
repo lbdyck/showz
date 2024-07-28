@@ -17,6 +17,8 @@
   |                    John Kalinich                           |
   |                                                            |
   | History:  (most recent on top)                             |
+  |     v0.7   2024/07/28 LBD - Add mode to display and remove |
+  |                             the command and tutorial       |
   |     v0.6   2024/07/28 LBD - Add MODE command               |
   |                           - Enhanced table row color       |
   |     v0.5   2024/07/28 LBD - More cleanup                   |
@@ -36,13 +38,13 @@
   |                                                            |
   * ---------------------------------------------------------- */
   /* -------------------------------------------------------------- *
-   | The commands ONLY and REFRESH are not enabled and the routines |
-   | are commented out.                                             |
-   | The reason is the FIND/RFIND do not work after ONLY is invoked |
-   | as the rowid is unchanged even with the non-matching rows      |
-   | deleted.  *** If anyone can fix this please ***                |
-   |                                                                |
-   * -------------------------------------------------------------- */
+  | The commands ONLY and REFRESH are not enabled and the routines |
+  | are commented out.                                             |
+  | The reason is the FIND/RFIND do not work after ONLY is invoked |
+  | as the rowid is unchanged even with the non-matching rows      |
+  | deleted.  *** If anyone can fix this please ***                |
+  |                                                                |
+  * -------------------------------------------------------------- */
 
   parse value '' with null
 
@@ -135,64 +137,41 @@
             end
           end
         end
-        When abbrev('MODE',word(zcmd,1)) = 1 then do
-             If words(zcmd) = 1 then zcmd = 'M B'
-           Select
-             When abbrev('BROWSE',word(zcmd,2)) = 1 then do
-                viewmode = 'Browse'
-                zerrsm = 'Browse Set.'
-                zerrlm = 'Mode changed to Browse.'
-                'setmsg msg(isrz003)'
-                end
-             When abbrev('VIEW',word(zcmd,2)) = 1 then do
-                viewmode = 'View'
-                zerrsm = 'View Set.'
-                zerrlm = 'Mode changed to View.'
-                'setmsg msg(isrz003)'
-                end
-             Otherwise do
-               zerrsm = 'Ignored.'
-               zerrlm = 'Mode unchanged as unrecognized - not Browse',
-                  'or View.'
-               'setmsg msg(isrz003)'
-               end
-           end
-           end
         When abbrev('ONLY',word(zcmd,1)) = 1 then do
-        orow = 0
-        search = translate(subword(zcmd,2))
-        'tbtop showzos'
-        do forever
-           'tbskip showzos'
-           if rc > 0 then leave
-           if pos(search,translate(title)) = 0 then do
+          orow = 0
+          search = translate(subword(zcmd,2))
+          'tbtop showzos'
+          do forever
+            'tbskip showzos'
+            if rc > 0 then leave
+            if pos(search,translate(title)) = 0 then do
               'tbdelete showzos'
               iterate
-              end
-           orow = orow + 1
-        end
-        if orow > 0 then do
-        'tbtop showzos'
-        zerrsm = 'Completed.'
-        zerrlm = 'Table display limited to ONLY criteria: "'search'"' ,
-            'in' orow 'titles.'
-        'setmsg msg(isrz003)'
-        showc = 'blue'
-        ztdtop = 0
-        end
-        else do
+            end
+            orow = orow + 1
+          end
+          if orow > 0 then do
+            'tbtop showzos'
+            zerrsm = 'Completed.'
+            zerrlm = 'Table display limited to ONLY criteria: "'search'"' ,
+              'in' orow 'titles.'
+            'setmsg msg(isrz003)'
+            showc = 'blue'
+            ztdtop = 0
+          end
+          else do
             'tbend showzos'
             call build_table
-            end
+          end
         end
         When abbrev('REFRESH',word(zcmd,1)) = 1 then do
-           'tbend showzos'
-           call build_table
-           zerrsm = 'Refreshed.'
-           zerrlm = 'SHOWZOS Table Refreshed.'
-           'setmsg msg(isrz003)'
+          'tbend showzos'
+          call build_table
+          zerrsm = 'Refreshed.'
+          zerrlm = 'SHOWZOS Table Refreshed.'
+          'setmsg msg(isrz003)'
           showc = 'turq'
-           end
+        end
         otherwise rowid = 0
       end
     end
@@ -671,18 +650,19 @@ DropISPF: Procedure
 >Panel showzos
 )Attr Default(%+_)
   @ type(Output) color(&showc)
-  ! type(Output) color(red) color(blue)
   _ type(input) hilite(uscore) intens(low) caps(on)
-  $ type(input) hilite(uscore) intens(low) caps(on) color(white)
+  $ type(input) hilite(uscore) intens(low) caps(off) color(white)
+  ! type(input) intens(low) caps(off) color(white)
+  # type(text) color(blue)
 )Body  Expand(\\)
 %-\-\- SHOWzOS &rel Section Table - &ver %-\-\-
 %Command ===>_zcmd                                 \ \%Scroll ===>_amt +
-%
+%                                                   \ \#Mode ===>!z     +
 %S  Section
 )Model
 $z+@z                                                                          +
 )Init
-  .ZVARS = '(sel title)'
+  .ZVARS = '(viewmode sel title)'
   &amt = CSR
   .help = showzosh
 )Proc
@@ -695,6 +675,8 @@ $z+@z                                                                          +
      if (&ztdsels ^= 0000)
           &row = .csrrow
      &osel = &vsel
+ &viewmode = trans(trunc(&viewmode,1) B,Browse V,View b,Browse v,View)
+ Ver (&viewmode,nb,list,Browse,View)
 )End
 >Panel showzosh
 )ATTR DEFAULT(%+_)
@@ -709,7 +691,6 @@ $z+@z                                                                          +
 +
 +Primary Commands:
   %  Find string      +Find row with string
-  %  Mode B or V      +Set display mode Browse or View
   %  Only string      +Display all sections with string
   %  Refresh          +Display all sections (used after Only)
 +
