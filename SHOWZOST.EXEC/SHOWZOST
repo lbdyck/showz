@@ -8,9 +8,12 @@
   |                                                            |
   | Usage Notes:  1. See *custom*                              |
   |                                                            |
-  | Dependencies:  SHOWZOS installed                           |
+  | Dependencies:  SHOWZOS installed (CBT File 492)            |
   |                                                            |
   | Author:    Lionel B. Dyck                                  |
+  |                                                            |
+  | Acknowledgements:  Roland Schiradin                        |
+  |                    John Kalinich                           |
   |                                                            |
   | History:  (most recent on top)                             |
   |     v0.4   2024/07/28 LBD - Add Only/Refresh               |
