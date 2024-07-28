@@ -13,4 +13,6 @@ will not be generated.
 
 SHOWZOS can be found on the www.cbttape.org site in File 492.
 
-Thank you to Roland Schiradin for developing SHOWZOS....
+Thank you to Roland Schiradin for maintaining and enhancing SHOWZOS
+and to the late Gilbert Saint-flour for developing it and sharing
+it with the mainframe community.
