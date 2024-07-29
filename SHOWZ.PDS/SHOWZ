@@ -274,7 +274,7 @@ Build_Table:
   lrecl = lrecl + 4  /* add rdw */
   table.section.0 = row
   'tbcreate showzos names(title part) nowrite'
-  title = '--- All SHOWZos Reports ---'
+  title = '--- All SHOWZos Sections ---'
   part  = 0
   'tbadd showzos'
   do i = 1 to section
@@ -710,8 +710,10 @@ $z+@z                                                                          +
   %  Only string      +Display all sections with string
   %  Refresh          +Display all sections (used after Only)
 +
++    * abbreviate as%F+or%O+or%R+to save typing.
++
 +Line Commands:
-%    any+             +Any non-blank to Select a SHOWzOS report to be Viewed
+%    any+             +Any non-blank to Select a SHOWzOS section to be Viewed
 +                      Or just place the cursor and press Enter
 +
 +  This ISPF dialog is built on top of the great work of%Gilbert Saint-flour+
