@@ -1,5 +1,5 @@
   /* --------------------  rexx procedure  -------------------- */
-  ver = '0.8'
+  ver = '0.9'
   /*Name:      SHOWZ                                           |
   |                                                            |
   | Function:  Display the SHOWZOS reports in an ISPF Table    |
@@ -20,6 +20,7 @@
   |                    John Kalinich                           |
   |                                                            |
   | History:  (most recent on top)                             |
+  |     v0.9   2024/07/29 LBD - Enable multi-row select        |
   |     v0.8   2024/07/29 LBD - Add initial filter option      |
   |     v0.7   2024/07/28 LBD - Add mode to display and remove |
   |                             the command and tutorial       |
@@ -88,16 +89,22 @@
      opt = null
      end
   do forever
-    sel = null
-    zcmd = null
-    shorfind = 'PASSTHRU'
-    'vput (shorfind)'
-    'tbtop showzos'
-    'tbskip showzos number('ztdtop')'
-    'tbdispl showzos panel(showzos) csrrow('rowid') rowid(row)'
-    if rc > 4 then leave
-    shorfind = null
-    'vput (shorfind)'
+    if ztdsels > 1 then do
+       'tbdispl showzos'
+       'tbget showzos position(row)'
+       end
+    else do
+         sel = null
+         zcmd = null
+         shorfind = 'PASSTHRU'
+         'vput (shorfind)'
+         'tbtop showzos'
+         'tbskip showzos number('ztdtop')'
+         'tbdispl showzos panel(showzos) rowid(row)'
+         if rc > 4 then leave
+         shorfind = null
+         'vput (shorfind)'
+         end
     /* --------------------- *
     | Process zcmd - if any |
     * --------------------- */
@@ -164,8 +171,6 @@
     | Process row selection - if any |
     * ------------------------------ */
     else if row > 0 then do
-      'tbtop showzos'
-      'tbskip showzos number('row')'
       'control display save'
       call display_it
       'control display restore'
