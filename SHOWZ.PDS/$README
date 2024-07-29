@@ -1,7 +1,7 @@
-SHOWZOST ISPF Dialog
+SHOWZ ISPF Dialog
 --------------------
 
-SHOWZOST is an ISPF dialog that displays the SHOWZOS sections in
+SHOWZ is an ISPF dialog that displays the SHOWZOS sections in
 a selectable ISPF table where each section is a table row.
 
 This dialog is written in REXX and dynamically loads the required
@@ -22,9 +22,9 @@ be generated.
 Installation
 ------------
 
-1. Customize the SHOWZOST to reference the load library where
+1. Customize the SHOWZ to reference the load library where
    SHOWZOS is installed.
-2. Copy member SHOWZOST into a library in your SYSEXEC or SYSPROC
+2. Copy member SHOWZ into a library in your SYSEXEC or SYSPROC
    allocations.
 
 SHOWZOS

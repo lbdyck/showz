@@ -1,10 +1,10 @@
   /* --------------------  rexx procedure  -------------------- */
   ver = '0.8'
-  /*Name:      SHOWZOST                                        |
+  /*Name:      SHOWZ                                           |
   |                                                            |
   | Function:  Display the SHOWZOS reports in an ISPF Table    |
   |                                                            |
-  | Syntax:    %showzost opt                                   |
+  | Syntax:    %SHOWZ opt                                      |
   |                                                            |
   |            opt is an optional initial filter string        |
   |            similar to using the ONLY command.              |
@@ -702,7 +702,7 @@ $z+@z                                                                          +
    @   TYPE(TEXT)  INTENS(HIGH) SKIP(ON) HILITE(USCORE) COLOR(BLUE)
    _   TYPE(INPUT) INTENS(HIGH) CAPS(ON) JUST(LEFT) HILITE(USCORE)
 )BODY EXPAND(\\)
-%Tutorial+\-\(%SHOWzOST+)\-\%Tutorial
+%Tutorial+\-\(%SHOWZ+)\-\%Tutorial
 %Command ===>_ZCMD
 +
 +Primary Commands:
