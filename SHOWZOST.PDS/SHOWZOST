@@ -1,10 +1,13 @@
   /* --------------------  rexx procedure  -------------------- */
-  ver = '0.6'
+  ver = '0.8'
   /*Name:      SHOWZOST                                        |
   |                                                            |
   | Function:  Display the SHOWZOS reports in an ISPF Table    |
   |                                                            |
-  | Syntax:    %showzost                                       |
+  | Syntax:    %showzost opt                                   |
+  |                                                            |
+  |            opt is an optional initial filter string        |
+  |            similar to using the ONLY command.              |
   |                                                            |
   | Usage Notes:  1. See *custom*                              |
   |                                                            |
@@ -17,6 +20,7 @@
   |                    John Kalinich                           |
   |                                                            |
   | History:  (most recent on top)                             |
+  |     v0.8   2024/07/29 LBD - Add initial filter option      |
   |     v0.7   2024/07/28 LBD - Add mode to display and remove |
   |                             the command and tutorial       |
   |     v0.6   2024/07/28 LBD - Add MODE command               |
@@ -45,6 +49,8 @@
   | deleted.  *** If anyone can fix this please ***                |
   |                                                                |
   * -------------------------------------------------------------- */
+
+  arg opt
 
   parse value '' with null
 
@@ -76,6 +82,11 @@
   | Now process the table |
   * --------------------- */
   rel = substr(show.1,26,4)
+  if opt /= null then do
+     zcmd = 'ONLY' opt
+     call do_only
+     opt = null
+     end
   do forever
     sel = null
     zcmd = null
@@ -137,33 +148,7 @@
             end
           end
         end
-        When abbrev('ONLY',word(zcmd,1)) = 1 then do
-          orow = 0
-          search = translate(subword(zcmd,2))
-          'tbtop showzos'
-          do forever
-            'tbskip showzos'
-            if rc > 0 then leave
-            if pos(search,translate(title)) = 0 then do
-              'tbdelete showzos'
-              iterate
-            end
-            orow = orow + 1
-          end
-          if orow > 0 then do
-            'tbtop showzos'
-            zerrsm = 'Completed.'
-            zerrlm = 'Table display limited to ONLY criteria: "'search'"' ,
-              'in' orow 'titles.'
-            'setmsg msg(isrz003)'
-            showc = 'blue'
-            ztdtop = 0
-          end
-          else do
-            'tbend showzos'
-            call build_table
-          end
-        end
+        When abbrev('ONLY',word(zcmd,1)) = 1 then call do_only
         When abbrev('REFRESH',word(zcmd,1)) = 1 then do
           'tbend showzos'
           call build_table
@@ -195,6 +180,37 @@
   'tbend showzos'
   rc = dropispf(load_info)
   Exit 0
+
+  /* ------------------------ *
+  | Process the Only command |
+  * ------------------------ */
+Do_Only:
+  orow = 0
+  search = translate(subword(zcmd,2))
+  'tbtop showzos'
+  do forever
+    'tbskip showzos'
+    if rc > 0 then leave
+    if pos(search,translate(title)) = 0 then do
+      'tbdelete showzos'
+      iterate
+    end
+    orow = orow + 1
+  end
+  if orow > 0 then do
+    'tbtop showzos'
+    zerrsm = 'Completed.'
+    zerrlm = 'Table display limited to ONLY criteria: "'search'"' ,
+      'in' orow 'titles.'
+    'setmsg msg(isrz003)'
+    showc = 'blue'
+    ztdtop = 0
+  end
+  else do
+    'tbend showzos'
+    call build_table
+  end
+  return
 
 Display_It:
   Address TSO
