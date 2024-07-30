@@ -1,5 +1,5 @@
   /* --------------------  rexx procedure  -------------------- */
-  ver = '0.9'
+  ver = '1.0'
   /*Name:      SHOWZ                                           |
   |                                                            |
   | Function:  Display the SHOWZOS reports in an ISPF Table    |
@@ -20,6 +20,7 @@
   |                    John Kalinich                           |
   |                                                            |
   | History:  (most recent on top)                             |
+  |     v1.0   2024/07/30 LBD - Remove obsolete tbdispl keyword|
   |     v0.9   2024/07/29 LBD - Enable multi-row select        |
   |     v0.8   2024/07/29 LBD - Add initial filter option      |
   |     v0.7   2024/07/28 LBD - Add mode to display and remove |
@@ -100,7 +101,7 @@
          'vput (shorfind)'
          'tbtop showzos'
          'tbskip showzos number('ztdtop')'
-         'tbdispl showzos panel(showzos) rowid(row)'
+         'tbdispl showzos panel(showzos) position(row)'
          if rc > 4 then leave
          shorfind = null
          'vput (shorfind)'
@@ -705,7 +706,7 @@ $z+@z                                                                          +
    +   TYPE(TEXT)  INTENS(LOW)  SKIP(ON) COLOR(TURQ)
    !   TYPE(TEXT)  INTENS(LOW)  SKIP(ON) COLOR(RED)
    @   TYPE(TEXT)  INTENS(HIGH) SKIP(ON) HILITE(USCORE) COLOR(BLUE)
-   _   TYPE(INPUT) INTENS(HIGH) CAPS(ON) JUST(LEFT) HILITE(USCORE)
+   _   TYPE(INPUT) INTENS(Low) CAPS(ON) JUST(LEFT) HILITE(USCORE)
 )BODY EXPAND(\\)
 %Tutorial+\-\(%SHOWZ+)\-\%Tutorial
 %Command ===>_ZCMD
