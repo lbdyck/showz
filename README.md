@@ -9,8 +9,9 @@ ISPF panels, which are located within the REXX code.
 ## Requirements
 
 First you ***must*** have SHOWZOS installed.
-    Note: if SHOWZOS is not executed APF authorized then 33 reports will
+    Note: 1) if SHOWZOS is not executed APF authorized then 33 reports will
           not be generated
+          2) Must be SHOWZOS Version 8.00 or newer.
 
 SHOWZOS can be found on the www.cbttape.org site in File 492.
 
