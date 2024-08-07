@@ -1,5 +1,5 @@
   /* --------------------  rexx procedure  -------------------- */
-  ver = '1.1'
+  ver = '1.2'
   /*Name:      SHOWZ                                           |
   |                                                            |
   | Function:  Display the SHOWZOS reports in an ISPF Table    |
@@ -20,6 +20,7 @@
   |                    John Kalinich                           |
   |                                                            |
   | History:  (most recent on top)                             |
+  |     v1.2   2024/08/07 LBD - change space alloc             |
   |     v1.1   2024/07/31 LBD - Fix bug in point-and-shoot     |
   |     v1.0   2024/07/30 LBD - Remove obsolete tbdispl keyword|
   |     v0.9   2024/07/29 LBD - Enable multi-row select        |
@@ -225,7 +226,7 @@ Do_Only:
 
 Display_It:
   Address TSO
-  'Alloc f(showzos) unit(vio) spa(5,5) tr recfm(v b) lrecl('lrecl')' ,
+  'Alloc f(showzos) unit(vio) spa(15,15) tr recfm(v b) lrecl('lrecl')' ,
     'blksize(0) new reuse'
   if part = 0
   then 'execio * diskw showzos (finis stem show.'
@@ -247,10 +248,7 @@ Build_Table:
   if datatype(show.0) /= 'NUM' then do
     Address TSO
     'Alloc f(showmvs) unit(vio) spa(30,30) tr new'
-    call outtrap 'xhow.'
     "call '"loadlib"(showzos)' 'HARD-COPY'"
-    call outtrap 'off'
-    drop xhow.
     'Execio * diskr showmvs (finis stem show.'
     'Free f(showmvs)'
     Address ISPExec
