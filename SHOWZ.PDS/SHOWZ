@@ -1,5 +1,5 @@
   /* --------------------  rexx procedure  -------------------- */
-  ver = '1.2'
+  ver = '1.3'
   /*Name:      SHOWZ                                           |
   |                                                            |
   | Function:  Display the SHOWZOS reports in an ISPF Table    |
@@ -20,6 +20,7 @@
   |                    John Kalinich                           |
   |                                                            |
   | History:  (most recent on top)                             |
+  |     v1.3   2024/09/02 LBD - enable browse/view selects     |
   |     v1.2   2024/08/07 LBD - change space alloc             |
   |     v1.1   2024/07/31 LBD - Fix bug in point-and-shoot     |
   |     v1.0   2024/07/30 LBD - Remove obsolete tbdispl keyword|
@@ -233,7 +234,13 @@ Display_It:
   else 'execio * diskw showzos (finis stem table.'part'.'
   Address ISPExec
   "LMINIT DATAID(STATUS) DDname(showzos)"
-  viewmode 'dataid('status')'
+  Select
+    When sel = 'S' then vopt = viewmode
+    When sel = 'B' then vopt = 'Browse'
+    When sel = 'V' then vopt = 'View'
+    otherwise vopt = viewmode
+    end
+  vopt 'dataid('status')'
   "LMFree  Dataid("status")"
   Address TSO 'Free f(showzos)'
   return
@@ -676,7 +683,7 @@ DropISPF: Procedure
 )Attr Default(%+_)
   @ type(Output) color(&showc)
   _ type(input) hilite(uscore) intens(low) caps(on)
-  $ type(input) hilite(uscore) intens(low) caps(off) color(white)
+  $ type(input) hilite(uscore) intens(low) caps(on) color(white)
   ! type(input) intens(low) caps(off) color(white)
   # type(text) color(blue)
 )Body  Expand(\\)
@@ -722,6 +729,8 @@ $z+@z                                                                          +
 +    * abbreviate as%F+or%O+or%R+to save typing.
 +
 +Line Commands:
+%    B+               +Browse the selected section
+%    V+               +View the selected section
 %    any+             +Any non-blank to Select a SHOWzOS section to be Viewed
 +                      Or just place the cursor and press Enter
 +
