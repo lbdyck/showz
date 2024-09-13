@@ -1,5 +1,5 @@
   /* --------------------  rexx procedure  -------------------- */
-  ver = '1.3'
+  ver = '1.4'
   /*Name:      SHOWZ                                           |
   |                                                            |
   | Function:  Display the SHOWZOS reports in an ISPF Table    |
@@ -20,6 +20,7 @@
   |                    John Kalinich                           |
   |                                                            |
   | History:  (most recent on top)                             |
+  |     v1.4   2024/09/13 LBD - Correct multi-row select       |
   |     v1.3   2024/09/02 LBD - enable browse/view selects     |
   |     v1.2   2024/08/07 LBD - change space alloc             |
   |     v1.1   2024/07/31 LBD - Fix bug in point-and-shoot     |
@@ -704,8 +705,6 @@ $z+@z                                                                          +
         if (&row ^= 0)
             if (&sel = &z)
                 &sel = S
-     if (&ztdsels ^= 0000)
-          &row = .csrrow
      &osel = &vsel
  &viewmode = trans(trunc(&viewmode,1) B,Browse V,View b,Browse v,View)
  Ver (&viewmode,nb,list,Browse,View)
